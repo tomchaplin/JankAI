@@ -87,30 +87,20 @@ class Conv2dFunction(torch.autograd.Function):
 
         kernel_num, kernel_h, kernel_w = kernels.shape
 
-        def _compute_grad_image_batch():
+        if ctx.needs_input_grad[0]:
             grad_image_batch = torch.zeros(image_batch.shape, device=image_batch.device)
 
             for patch, h, w in _overlapping_patch_generator(image_batch, kernel_w):
                 grad_image_batch[
                     :, h : h + (kernel_h), w : (w + kernel_w)
                 ] += torch.einsum("khw,bk->bhw", kernels, grad_output[:, :, h, w])
-
-            return grad_image_batch
-
-        def _compute_grad_kernels():
+        if ctx.needs_input_grad[1]:
             grad_kernels = torch.zeros(kernels.shape, device=kernels.device)
 
             for patch, h, w in _overlapping_patch_generator(image_batch, kernel_w):
                 grad_kernels += torch.einsum(
                     "bhw,bk->khw", patch, grad_output[:, :, h, w]
                 )
-
-            return grad_kernels
-
-        if ctx.needs_input_grad[0]:
-            grad_image_batch = _compute_grad_image_batch()
-        if ctx.needs_input_grad[1]:
-            grad_kernels = _compute_grad_kernels()
 
         return grad_image_batch, grad_kernels
 
